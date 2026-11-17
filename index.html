@@ -121,6 +121,17 @@ kbd{font:800 10px Nunito;border:1px solid #fff5;border-radius:4px;padding:0 4px;
  .chipstat span:nth-child(n+3){display:none}.chipstat{margin-left:0;order:3;width:100%}.menu{margin-left:auto}
  .coach{grid-template-columns:auto minmax(0,1fr)}.verdict{grid-column:1/-1}
  .big{min-height:54px;font-size:16px}kbd{display:none}}
+
+.quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px}
+.quick[hidden]{display:none}
+.qb{min-height:56px;border-radius:14px;border:0;background:linear-gradient(#3d82f0,#2a62c9);color:#fff;cursor:pointer;font-weight:900;font-size:20px;line-height:1.05;display:grid;place-items:center;padding:6px 4px;box-shadow:inset 0 -3px 0 #0003;transition:transform .08s}
+.qb small{display:block;font-size:11px;font-weight:800;opacity:.8;letter-spacing:.3px}
+.qb:active{transform:scale(.96)}
+.qb.allin{background:linear-gradient(#f05a6a,#c43a4b)}
+.qb.armed{background:var(--gold);color:#241800;animation:none}
+.actions{position:sticky;bottom:8px;z-index:15;box-shadow:0 -12px 30px #000b}
+.qhead{font-size:12px;font-weight:800;color:var(--mute);margin:0 2px -2px}
+.rpanel .step{width:44px;height:44px;border-radius:12px;font-size:24px;line-height:1;padding:0}
 </style>
 </head>
 <body>
@@ -152,11 +163,15 @@ kbd{font:800 10px Nunito;border:1px solid #fff5;border-radius:4px;padding:0 4px;
     <section class="coach" id="coach"><div class="sub">Getting the table ready…</div></section>
     <section class="actions">
       <div class="rpanel" id="rp">
-        <span id="pre" style="display:flex;gap:6px;flex-wrap:wrap"></span>
-        <input type="range" id="rSl" aria-label="Raise amount">
-        <input type="number" id="rIn" aria-label="Raise to">
+        <span id="pre" hidden></span>
+        <button class="step" id="rMinus" aria-label="Less">−</button>
+        <input type="range" id="rSl" aria-label="Bet amount">
+        <button class="step" id="rPlus" aria-label="More">+</button>
+        <input type="number" id="rIn" aria-label="Bet amount">
         <button class="go" id="rGo">Confirm</button>
       </div>
+      <div class="qhead" id="qhead" hidden></div>
+      <div class="quick" id="quick" hidden></div>
       <div class="btnrow" id="btns">
         <button class="big b-fold" id="bFold">Fold<kbd>F</kbd></button>
         <button class="big b-call" id="bCall">Check<kbd>C</kbd></button>
@@ -488,7 +503,7 @@ function renderControls(){
   [bF,bC,bR].forEach(b=>{b.hidden=S.over;b.disabled=!my});
   bF.disabled=!my||toCall<=0;bR.disabled=!my||mx<=S.cur;
   bC.innerHTML=toCall>0?`Call ${Math.min(toCall,h.stack)}${toCall>=h.stack?'<small>all-in</small>':''}<kbd>C</kbd>`:'Check<kbd>C</kbd>';
-  bR.innerHTML=(S.cur===0?'Bet':'Raise')+'<kbd>R</kbd>';
+  bR.innerHTML='Custom'+'<kbd>R</kbd>';
   bN.hidden=!S.over;bN.innerHTML=h.stack<=0?'Rebuy 200 &amp; deal':'Deal next hand<kbd>N</kbd>';
   if(!my)S.rOpen=false;
   $('#rp').classList.toggle('on',!!S.rOpen&&my);
@@ -497,7 +512,29 @@ function renderControls(){
     const ps=S.cur===0?[['⅓ pot',pot/3],['½ pot',pot/2],['¾ pot',pot*.75],['Pot',pot]]:!S.street&&S.raises===0?[['2.5 BB',5],['3 BB',6],['4 BB',8]]:[['2.5×',S.cur*2.5],['3×',S.cur*3],['Pot',S.cur+pot+toCall]];
     $('#pre').innerHTML=ps.map(([l,v])=>`<button data-v="${Math.round(S.cur===0?h.bet+v:v)}">${l}</button>`).join('')+`<button data-v="${mx}">All-in</button>`;
     setR(mn)}
+  drawQuick(my&&mx>S.cur,S.cur,my?quickList(S.cur,S.street,S.raises,BB,h.bet,toCall,mx,mn,pot):[]);
+  if(!my)$('#quick').dataset.k='';
 }
+function quickList(cur,street,raises,bb,bet,toCall,mx,mn,pot){
+  const L=cur===0?[['⅓ pot',bet+pot/3],['½ pot',bet+pot/2],['¾ pot',bet+pot*.75],['Pot',bet+pot]]:(!street&&raises===0)?[['2.5 BB',bb*2.5],['3 BB',bb*3],['4 BB',bb*4]]:[['Min',mn],['2.5×',cur*2.5],['3×',cur*3],['Pot',cur+pot+toCall]];
+  const seen=new Set(),out=[];
+  for(const [l,v0] of L){const v=Math.max(mn,Math.min(mx,Math.round(v0)));if(v>=mx||seen.has(v))continue;seen.add(v);out.push([l,v])}
+  out.push(['All-in',mx]);return out;
+}
+function drawQuick(show,cur,list){
+  const q=document.getElementById('quick'),hd=document.getElementById('qhead');
+  q.hidden=hd.hidden=!show;if(!show)return;
+  hd.textContent=(cur===0?'Tap to bet':'Tap to raise to')+' — or use Custom for any amount';
+  const key=JSON.stringify(list);if(q.dataset.k===key)return;q.dataset.k=key;
+  q.innerHTML=list.map(([l,v])=>`<button class="qb ${l==='All-in'?'allin':''}" data-q="${v}" ${l==='All-in'?'data-allin':''}><span><small>${l}</small>${v}</span></button>`).join('');
+}
+let armT=null;
+function quickTap(e,fire){
+  const b=e.target.closest('.qb');if(!b)return;
+  if(b.hasAttribute('data-allin')&&!b.classList.contains('armed')){b.classList.add('armed');b.innerHTML=`<span><small>Tap again</small>All-in ${b.dataset.q}</span>`;clearTimeout(armT);armT=setTimeout(()=>{const q=document.getElementById('quick');q.dataset.k='';},2500);return}
+  fire(+b.dataset.q);
+}
+
 function setR(v){const h=P[0],mx=h.bet+h.stack,mn=Math.min(minTo(),mx);v=Math.max(mn,Math.min(mx,Math.round(v)||mn));$('#rSl').value=$('#rIn').value=v;$('#rGo').textContent=(S.cur===0?'Bet ':'Raise to ')+v}
 function save(){try{localStorage.setItem('txp-opt',JSON.stringify(opt))}catch(e){}}
 
@@ -509,6 +546,9 @@ $('#bNext').onclick=()=>{if(P[0].stack<=0){P[0].stack=START;L('You rebuy for 200
 $('#rSl').oninput=e=>setR(+e.target.value);
 $('#rIn').onchange=e=>setR(+e.target.value);
 $('#pre').onclick=e=>{const b=e.target.closest('button');if(b)setR(+b.dataset.v)};
+$('#quick').onclick=e=>quickTap(e,v=>{setR(v);heroAct('raise')});
+$('#rMinus').onclick=()=>setR(+$('#rIn').value-BB);
+$('#rPlus').onclick=()=>setR(+$('#rIn').value+BB);
 const bind=(id,k,f)=>{const el=$('#'+id);if(el.type==='checkbox'){el.checked=opt[k];el.onchange=()=>{opt[k]=el.checked;save();f&&f();render()}}else{el.value=opt[k];el.onchange=()=>{opt[k]=el.type==='select-one'&&!isNaN(+el.value)?+el.value:el.value;save();render()}}};
 bind('oLvl','lvl');bind('oSpd','spd');bind('oHint','hints');bind('oAuto','auto',()=>{if(!opt.auto)clearTimeout(nextT)});bind('oPeek','peek');bind('o4c','c4');
 document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'&&e.target.type==='number'){if(e.key==='Enter')heroAct('raise');return}const k=e.key.toLowerCase();

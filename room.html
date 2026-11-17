@@ -152,6 +152,17 @@ kbd{font:800 10px Nunito;border:1px solid #fff5;border-radius:4px;padding:0 4px;
 .or{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:12px;font-weight:800}.or::before,.or::after{content:"";flex:1;border-top:1px solid var(--line)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#e0364a;color:#fff;font-weight:800;padding:10px 18px;border-radius:12px;z-index:60;box-shadow:0 10px 30px #0009}
 .toast.ok{background:var(--green)}
+
+.quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px}
+.quick[hidden]{display:none}
+.qb{min-height:56px;border-radius:14px;border:0;background:linear-gradient(#3d82f0,#2a62c9);color:#fff;cursor:pointer;font-weight:900;font-size:20px;line-height:1.05;display:grid;place-items:center;padding:6px 4px;box-shadow:inset 0 -3px 0 #0003;transition:transform .08s}
+.qb small{display:block;font-size:11px;font-weight:800;opacity:.8;letter-spacing:.3px}
+.qb:active{transform:scale(.96)}
+.qb.allin{background:linear-gradient(#f05a6a,#c43a4b)}
+.qb.armed{background:var(--gold);color:#241800;animation:none}
+.actions{position:sticky;bottom:8px;z-index:15;box-shadow:0 -12px 30px #000b}
+.qhead{font-size:12px;font-weight:800;color:var(--mute);margin:0 2px -2px}
+.rpanel .step{width:44px;height:44px;border-radius:12px;font-size:24px;line-height:1;padding:0}
 </style>
 </head>
 <body>
@@ -174,11 +185,15 @@ kbd{font:800 10px Nunito;border:1px solid #fff5;border-radius:4px;padding:0 4px;
     <section class="coach" id="coach"></section>
     <section class="actions" id="actions">
       <div class="rpanel" id="rp">
-        <span id="pre" style="display:flex;gap:6px;flex-wrap:wrap"></span>
-        <input type="range" id="rSl" aria-label="Raise amount">
-        <input type="number" id="rIn" aria-label="Raise to">
+        <span id="pre" hidden></span>
+        <button class="step" id="rMinus" aria-label="Less">−</button>
+        <input type="range" id="rSl" aria-label="Bet amount">
+        <button class="step" id="rPlus" aria-label="More">+</button>
+        <input type="number" id="rIn" aria-label="Bet amount">
         <button class="go" id="rGo">Confirm</button>
       </div>
+      <div class="qhead" id="qhead" hidden></div>
+      <div class="quick" id="quick" hidden></div>
       <div class="btnrow" id="btns">
         <button class="big b-fold" id="bFold">Fold<kbd>F</kbd></button>
         <button class="big b-call" id="bCall">Check<kbd>C</kbd></button>
@@ -378,8 +393,8 @@ function render() {
 function renderControls() {
   const me = ME >= 0 ? S.seats[ME] : null, my = myTurn();
   const st2 = $('#status'), btns = $('#btns');
-  if (!me) { btns.hidden = true; $('#rp').classList.remove('on'); st2.innerHTML = `<div class="wait">You are watching. <button class="pill-btn" id="sitBtn">Take a seat</button></div>`; $('#sitBtn').onclick = () => $('#joinSheet').hidden = false; return }
-  if (!S.running) { btns.hidden = true; $('#rp').classList.remove('on'); const humans = S.seats.filter(p => p && !p.bot).length, n = S.seats.filter(Boolean).length; st2.innerHTML = ME === S.host ? `<button class="start" id="startBtn">Start the game (${n} player${n > 1 ? 's' : ''})</button><div class="wait" style="padding:8px 0 0">Send friends the invite link above. ${humans < 2 ? 'Bots can fill empty seats from the + buttons.' : ''}</div>` : `<div class="wait">Waiting for the host to start the game…</div>`; const sbn = $('#startBtn'); if (sbn) sbn.onclick = () => call('start').catch(() => {}); return }
+  if (!me) { btns.hidden = true; drawQuick(false); $('#rp').classList.remove('on'); st2.innerHTML = `<div class="wait">You are watching. <button class="pill-btn" id="sitBtn">Take a seat</button></div>`; $('#sitBtn').onclick = () => $('#joinSheet').hidden = false; return }
+  if (!S.running) { btns.hidden = true; drawQuick(false); $('#rp').classList.remove('on'); const humans = S.seats.filter(p => p && !p.bot).length, n = S.seats.filter(Boolean).length; st2.innerHTML = ME === S.host ? `<button class="start" id="startBtn">Start game${n < 6 ? ' — fill ' + (6 - n) + ' empty seat' + (6 - n > 1 ? 's' : '') + ' with bots' : ''}</button><div class="wait" style="padding:8px 0 0">Invite friends first with the link above. Friends who join later take over a bot's seat.</div>` : `<div class="wait">Waiting for the host to start the game…</div>`; const sbn = $('#startBtn'); if (sbn) sbn.onclick = startGame; return }
   btns.hidden = false; st2.innerHTML = '';
   if (me.stack <= 0 && (S.over || !me.inHand || me.folded)) st2.innerHTML = `<div class="wait">You're out of chips. <button class="pill-btn" id="rebuyBtn">Rebuy ${S.start}</button></div>`;
   else if (me.sitOut) st2.innerHTML = `<div class="wait">You're sitting out. <button class="pill-btn" id="backBtn">I'm back</button></div>`;
@@ -390,7 +405,7 @@ function renderControls() {
   const bF = $('#bFold'), bC = $('#bCall'), bR = $('#bRaise');
   bF.disabled = !my || toCall <= 0; bC.disabled = !my; bR.disabled = !my || mx <= S.cur;
   bC.innerHTML = toCall > 0 ? `Call ${Math.min(toCall, me.stack)}${toCall >= me.stack ? '<small>all-in</small>' : ''}<kbd>C</kbd>` : 'Check<kbd>C</kbd>';
-  bR.innerHTML = (S.cur === 0 ? 'Bet' : 'Raise') + '<kbd>R</kbd>';
+  bR.innerHTML = 'Custom<kbd>R</kbd>';
   if (!my) rOpen = false;
   $('#rp').classList.toggle('on', rOpen && my);
   const sl = $('#rSl'), inp = $('#rIn'), key = S.hand + '|' + S.street + '|' + S.cur;
@@ -400,7 +415,29 @@ function renderControls() {
     $('#pre').innerHTML = ps.map(([l, v]) => `<button data-v="${Math.round(S.cur === 0 ? me.bet + v : v)}">${l}</button>`).join('') + `<button data-v="${mx}">All-in</button>`;
     setR(mn);
   }
+  drawQuick(my && mx > S.cur, S.cur, my ? quickList(S.cur, S.street, S.raises, S.bb, me.bet, toCall, mx, mn, pot) : []);
+  if (!my) $('#quick').dataset.k = '';
 }
+function quickList(cur,street,raises,bb,bet,toCall,mx,mn,pot){
+  const L=cur===0?[['⅓ pot',bet+pot/3],['½ pot',bet+pot/2],['¾ pot',bet+pot*.75],['Pot',bet+pot]]:(!street&&raises===0)?[['2.5 BB',bb*2.5],['3 BB',bb*3],['4 BB',bb*4]]:[['Min',mn],['2.5×',cur*2.5],['3×',cur*3],['Pot',cur+pot+toCall]];
+  const seen=new Set(),out=[];
+  for(const [l,v0] of L){const v=Math.max(mn,Math.min(mx,Math.round(v0)));if(v>=mx||seen.has(v))continue;seen.add(v);out.push([l,v])}
+  out.push(['All-in',mx]);return out;
+}
+function drawQuick(show,cur,list){
+  const q=document.getElementById('quick'),hd=document.getElementById('qhead');
+  q.hidden=hd.hidden=!show;if(!show)return;
+  hd.textContent=(cur===0?'Tap to bet':'Tap to raise to')+' — or use Custom for any amount';
+  const key=JSON.stringify(list);if(q.dataset.k===key)return;q.dataset.k=key;
+  q.innerHTML=list.map(([l,v])=>`<button class="qb ${l==='All-in'?'allin':''}" data-q="${v}" ${l==='All-in'?'data-allin':''}><span><small>${l}</small>${v}</span></button>`).join('');
+}
+let armT=null;
+function quickTap(e,fire){
+  const b=e.target.closest('.qb');if(!b)return;
+  if(b.hasAttribute('data-allin')&&!b.classList.contains('armed')){b.classList.add('armed');b.innerHTML=`<span><small>Tap again</small>All-in ${b.dataset.q}</span>`;clearTimeout(armT);armT=setTimeout(()=>{const q=document.getElementById('quick');q.dataset.k='';},2500);return}
+  fire(+b.dataset.q);
+}
+
 function setR(v) { const me = S.seats[ME], mx = me.bet + me.stack, mn = Math.min(C.minTo(S), mx); v = Math.max(mn, Math.min(mx, Math.round(v) || mn)); $('#rSl').value = $('#rIn').value = v; $('#rGo').textContent = (S.cur === 0 ? 'Bet ' : 'Raise to ') + v }
 function renderMenu() {
   if ($('#menu').open) return;
@@ -432,6 +469,13 @@ $('#rGo').onclick = () => act('raise');
 $('#rSl').oninput = e => setR(+e.target.value);
 $('#rIn').onchange = e => setR(+e.target.value);
 $('#pre').onclick = e => { const b = e.target.closest('button'); if (b) setR(+b.dataset.v) };
+$('#quick').onclick = e => quickTap(e, v => { setR(v); act('raise') });
+$('#rMinus').onclick = () => setR(+$('#rIn').value - S.bb);
+$('#rPlus').onclick = () => setR(+$('#rIn').value + S.bb);
+async function startGame() {
+  const b = $('#startBtn'); if (b) { b.disabled = true; b.textContent = 'Seating bots…' }
+  try { const empty = S.seats.filter(p => !p).length; for (let i = 0; i < empty; i++) await call('addbot'); await call('start') } catch (e) { if (b) { b.disabled = false; b.textContent = 'Start game' } }
+}
 $('#seats').onclick = e => {
   const k = e.target.closest('[data-kick]'), a = e.target.closest('[data-addbot]'), s = e.target.closest('[data-sit]');
   if (k && confirm('Remove this player from the table?')) call('kick', { seat: +k.dataset.kick }).catch(() => {});
@@ -441,6 +485,7 @@ $('#seats').onclick = e => {
 $('#pop').onclick = e => {
   const b = e.target.closest('button[data-op]'); if (!b) return;
   const op = b.dataset.op;
+  if (op === 'start') { $('#menu').open = false; startGame(); return }
   if (op === 'leave' && !confirm('Leave the table?')) return;
   call(op, op === 'sit' ? { out: b.dataset.out === '1' } : {}).then(() => { if (op === 'leave') { ME = -1; CARDS = null; render() } }).catch(() => {});
   $('#menu').open = false;
