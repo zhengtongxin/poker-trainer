@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Poker Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a focused card room with a coach whispering the numbers
+   IDEA: a felt table with the coach's clipboard beside it
+   PICTURE: the live table itself, seats around a felt oval
+   COLOUR/TYPE: deep felt green, walnut rail, chip gold accent; Barlow Condensed for numbers, Inter for text
+   LAYOUT: table + action bar left, odds clipboard right; stacks under 960px */
+:root{color-scheme:light dark;--bg:light-dark(#e7ebe8,#0d1210);--panel:light-dark(#ffffff,#161e1a);--ink:light-dark(#13201a,#e5ece7);--mute:light-dark(#5a6a61,#91a198);--line:light-dark(#d3dbd6,#28332d);--felt:#1c6a48;--felt2:#0f3f2b;--rail:#3a291d;--gold:#f2b33d;--bad:#d8343f;--good:#1f9a5b;--s0:#151515;--s1:#d8343f;--s2:#2f6fd6;--s3:#1f8a4c}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;overflow-x:clip}
+.num,.big{font-family:"Barlow Condensed",Inter,sans-serif;font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;padding:12px max(2vw,12px)}
+h1{font:700 26px/1.05 "Barlow Condensed",sans-serif;margin:0}
+.stats{display:flex;gap:14px;flex-wrap:wrap;color:var(--mute);font-size:13px}.stats b{color:var(--ink);font:600 17px "Barlow Condensed"}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;padding:0 max(2vw,12px) 24px;max-width:1440px;margin:0 auto}
+@media(max-width:960px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.table{position:relative;aspect-ratio:16/10;min-height:430px;border-radius:22px;background:radial-gradient(120% 90% at 50% 0%,#24382e,#0c1511)}
+.oval{position:absolute;inset:13% 9% 15%;border-radius:999px;background:radial-gradient(ellipse at 50% 40%,var(--felt),var(--felt2));border:14px solid var(--rail);box-shadow:inset 0 0 0 2px #6b4c34,inset 0 10px 40px #0007,0 18px 40px #0008}
+.seat{position:absolute;transform:translate(-50%,-50%);width:132px;text-align:center;z-index:2}
+.plate{background:#0f1512ee;color:#eef3ef;border:2px solid #2c3a33;border-radius:12px;padding:10px 6px 6px;position:relative}
+.seat.turn .plate{border-color:var(--gold);box-shadow:0 0 0 3px #f2b33d55}
+.seat.fold{opacity:.42}
+.nm{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm small{font-weight:600;color:#9fb3a8;margin-left:4px}
+.stk{font:600 18px "Barlow Condensed";color:var(--gold)}
+.lastA{font-size:12px;color:#b8c9bf;min-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cards{display:flex;justify-content:center;gap:4px;margin-bottom:-6px;position:relative;z-index:1}
+.dbtn{position:absolute;top:-10px;right:-10px;width:24px;height:24px;border-radius:50%;background:#fff;color:#111;font:700 13px/24px Inter;box-shadow:0 2px 4px #0008}
+.pos{position:absolute;top:-10px;left:-8px;background:#2c3a33;color:#cfe0d6;font:700 10px/18px Inter;padding:0 6px;border-radius:9px}
+.cd{width:42px;height:60px;border-radius:6px;background:#fff;color:var(--c);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 6px #0007;font-family:"Barlow Condensed";line-height:1}
+.cd b{font-size:26px;font-weight:700}.cd i{font-style:normal;font-size:20px}
+.cd.back{background:repeating-linear-gradient(45deg,#8a1f2b 0 5px,#a32a37 5px 10px);border:3px solid #fff}
+.cd.win{outline:3px solid var(--gold)}
+.board .cd{width:52px;height:74px}.board .cd b{font-size:32px}.board .cd i{font-size:24px}
+.board{position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);display:flex;gap:6px;z-index:1}
+.slot{width:52px;height:74px;border-radius:6px;border:2px dashed #ffffff22}
+.pot{position:absolute;left:50%;top:31%;transform:translate(-50%,-50%);color:#fff;background:#0008;padding:3px 14px;border-radius:999px;font:600 20px "Barlow Condensed";white-space:nowrap;z-index:1}
+.bet{position:absolute;transform:translate(-50%,-50%);color:#fff;font:600 16px "Barlow Condensed";display:flex;align-items:center;gap:5px;z-index:1;white-space:nowrap}
+.bet::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--gold);border:3px dashed #fff8}
+.banner{position:absolute;left:50%;top:64%;transform:translate(-50%,-50%);background:var(--gold);color:#1a1205;font-weight:700;padding:6px 14px;border-radius:10px;z-index:3;max-width:80%;text-align:center;font-size:14px}
+.banner{font-size:14px}@media(max-width:600px){.banner{font-size:12px;top:67%;max-width:62%}}
+.s0{left:50%;top:88%}.s1{left:9%;top:68%}.s2{left:11%;top:22%}.s3{left:50%;top:10%}.s4{left:89%;top:22%}.s5{left:91%;top:68%}
+.b0{left:50%;top:69%}.b1{left:24%;top:63%}.b2{left:26%;top:33%}.b3{left:50%;top:22%}.b4{left:74%;top:33%}.b5{left:76%;top:63%}
+@media(max-width:600px){.table{aspect-ratio:auto;height:500px}.seat{width:96px}.cd{width:32px;height:46px}.cd b{font-size:20px}.cd i{font-size:15px}.board .cd,.slot{width:40px;height:58px}.board .cd b{font-size:24px}.oval{inset:16% 4% 16%;border-width:9px}.s1{left:13%;top:66%}.s5{left:87%;top:66%}.s2{left:14%;top:25%}.s4{left:86%;top:25%}.b1{left:30%;top:60%}.b5{left:70%;top:60%}.b2{left:30%;top:36%}.b4{left:70%;top:36%}.board{top:48%}}
+.bar{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:10px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:600 15px Inter;min-height:44px;padding:0 16px;border-radius:11px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed}
+.fold{background:#3a1a1d;color:#ffd9dc;border-color:#5a2a2e}
+.call{background:#14402b;color:#d9f5e6;border-color:#1f5e40}
+.raise{background:var(--gold);color:#1d1406;border-color:#c98f20}
+.grow{flex:1 1 120px}
+.rz{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rz input[type=range]{flex:1 1 180px;accent-color:var(--gold);min-height:44px}
+.rz input[type=number]{width:96px;font:600 18px "Barlow Condensed";min-height:44px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.rz button{min-height:38px;padding:0 10px;font-size:13px}
+.opts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--mute);align-items:center}
+.opts label{display:flex;gap:6px;align-items:center;min-height:32px;cursor:pointer}
+.opts select{font:13px Inter;min-height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.side{display:grid;gap:14px;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.card h2{font:700 19px/1.1 "Barlow Condensed";margin:0 0 8px;letter-spacing:.2px}
+.hand{font:700 30px/1.05 "Barlow Condensed";margin:0 0 2px}
+.mute{color:var(--mute);font-size:13px;margin:0}
+.eqrow{display:grid;grid-template-columns:112px minmax(0,1fr) 56px;gap:8px;align-items:center;margin:6px 0;font-size:13px}
+.meter{height:12px;border-radius:6px;background:var(--line);overflow:hidden;display:flex}
+.meter i{display:block;height:100%}
+.eqrow b{font:700 19px "Barlow Condensed";text-align:right}
+.odds{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--bg);font-size:13px}
+.odds strong{font:700 18px "Barlow Condensed"}
+.ok{color:var(--good)}.no{color:var(--bad)}
+.grp{margin:8px 0 0;font-size:13px}
+.grp .t{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.lc{display:inline-block;font:700 14px/20px "Barlow Condensed";padding:0 5px;border-radius:5px;background:#fff;color:var(--c);border:1px solid #0002}
+.cls{font:600 13px "Barlow Condensed";padding:1px 6px;border-radius:5px;background:var(--bg);border:1px solid var(--line)}
+.log{max-height:260px;overflow:auto;font-size:13px;display:grid;gap:2px}
+.log .st{font-weight:700;margin-top:6px;color:var(--mute)}
+.log .w{font-weight:700;color:var(--good)}
+.coach{padding:10px 12px;border-radius:12px;font-size:13px;border:1px solid var(--line)}
+kbd{font:600 11px Inter;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.c0{--c:var(--s0)}.c1{--c:var(--s1)}.c2{--c:var(--s2)}.c3{--c:var(--s3)}
+.two .c2{--c:var(--s0)}.two .c3{--c:var(--s1)}
+@media(prefers-reduced-motion:no-preference){.seat.turn .plate{animation:pulse 1.2s ease-in-out infinite}@keyframes pulse{50%{box-shadow:0 0 0 6px #f2b33d22}}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Poker Trainer · 6-max NLHE 1/2</h1>
+  <div class="stats" id="stats"></div>
+</header>
+<div class="wrap">
+  <main>
+    <div class="table" id="table">
+      <div class="oval"></div>
+      <div class="pot num" id="pot">Shuffling…</div>
+      <div class="board" id="board"></div>
+      <div id="seats"></div>
+      <div id="bets"></div>
+      <div id="banner"></div>
+    </div>
+    <div class="bar">
+      <div class="btns">
+        <button class="fold grow" id="bFold">Fold <kbd>F</kbd></button>
+        <button class="call grow" id="bCall">Check <kbd>C</kbd></button>
+        <button class="raise grow" id="bRaise">Raise <kbd>R</kbd></button>
+        <button class="grow" id="bNext" hidden>Deal next hand <kbd>N</kbd></button>
+      </div>
+      <div class="rz" id="rz">
+        <input type="range" id="rSl" aria-label="Raise amount">
+        <input type="number" id="rIn" aria-label="Raise to">
+        <span id="pre" class="btns"></span>
+      </div>
+      <div class="opts">
+        <label>Bot speed <select id="oSpd"><option value="350">Fast</option><option value="800" selected>Normal</option><option value="1400">Slow</option></select></label>
+        <label><input type="checkbox" id="oAuto" checked> Auto-deal</label>
+        <label><input type="checkbox" id="oPeek"> Study mode (show bot cards)</label>
+        <label><input type="checkbox" id="o4c" checked> 4-colour deck</label>
+      </div>
+    </div>
+  </main>
+  <aside class="side">
+    <section class="card" id="helper"><p class="mute">Loading…</p></section>
+    <section class="card"><h2>Coach</h2><div id="coach" class="coach">Each time you face a bet, your decision is checked against the pot odds and your equity vs the bots' likely ranges.</div></section>
+    <section class="card"><h2>Hand log</h2><div class="log" id="log"></div></section>
+  </aside>
+</div>
+<script>
+{
+const $=s=>document.querySelector(s);
+const RANKS='23456789TJQKA',SYM=['♠','♥','♦','♣'];
+const RN=['Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Jack','Queen','King','Ace'];
+const pl=r=>r===4?'Sixes':RN[r]+'s';
+const CAT=['High card','Pair','Two pair','Three of a kind','Straight','Flush','Full house','Four of a kind','Straight flush'];
+const rk=c=>c>>2,st=c=>c&3,BB=2,SB=1,START=200;
+const pc=x=>(x*100).toFixed(x<.1?1:0)+'%';
+const rl=r=>r===8?'10':RANKS[r];
+
+/* ---------- hand evaluator (5-7 cards) ---------- */
+const RC=new Int8Array(13),SM=[0,0,0,0],SC=[0,0,0,0];
+function sHigh(m){for(let h=12;h>=4;h--){const x=0x1F<<(h-4);if((m&x)===x)return h}return (m&0x100F)===0x100F?3:-1}
+function kick(ex,n){let v=0,c=0;for(let r=12;r>=0&&c<n;r--)if(RC[r]&&!(ex>>r&1)){v=v<<4|r;c++}while(c<n){v<<=4;c++}return v}
+function ev(cs){
+  RC.fill(0);SM[0]=SM[1]=SM[2]=SM[3]=0;SC[0]=SC[1]=SC[2]=SC[3]=0;let all=0;
+  for(let k=0;k<cs.length;k++){const c=cs[k],r=c>>2,s=c&3;RC[r]++;SM[s]|=1<<r;SC[s]++;all|=1<<r}
+  let fs=-1;for(let s=0;s<4;s++)if(SC[s]>=5)fs=s;
+  if(fs>=0){const h=sHigh(SM[fs]);if(h>=0)return 8<<20|h<<16}
+  let q=-1,t1=-1,t2=-1,p1=-1,p2=-1;
+  for(let r=12;r>=0;r--){const n=RC[r];if(n===4)q=r;else if(n===3){if(t1<0)t1=r;else if(t2<0)t2=r}else if(n===2){if(p1<0)p1=r;else if(p2<0)p2=r}}
+  if(q>=0)return 7<<20|q<<16|kick(1<<q,1)<<12;
+  if(t1>=0&&(t2>=0||p1>=0))return 6<<20|t1<<16|Math.max(t2,p1)<<12;
+  if(fs>=0){let m=SM[fs],v=0,c=0;for(let r=12;r>=0&&c<5;r--)if(m>>r&1){v=v<<4|r;c++}return 5<<20|v}
+  const h=sHigh(all);if(h>=0)return 4<<20|h<<16;
+  if(t1>=0)return 3<<20|t1<<16|kick(1<<t1,2)<<8;
+  if(p1>=0&&p2>=0)return 2<<20|p1<<16|p2<<12|kick(1<<p1|1<<p2,1)<<8;
+  if(p1>=0)return 1<<20|p1<<16|kick(1<<p1,3)<<4;
+  return kick(0,5);
+}
+function hname(s){const c=s>>20,a=s>>16&15,b=s>>12&15;
+  return [`${RN[a]}-high`,`Pair of ${pl(a)}`,`Two pair, ${pl(a)} & ${pl(b)}`,`Three ${pl(a)}`,`Straight, ${RN[a]}-high`,`Flush, ${RN[a]}-high`,`Full house, ${pl(a)} full of ${pl(b)}`,`Four ${pl(a)}`,a===12?'Royal flush':`Straight flush, ${RN[a]}-high`][c]}
+
+/* ---------- preflop classes & strength percentile ---------- */
+function cls(a,b){const x=rk(a),y=rk(b),hi=Math.max(x,y),lo=Math.min(x,y);if(hi===lo)return hi*13+hi;return st(a)===st(b)?hi*13+lo:lo*13+hi}
+function clsName(i){const x=Math.floor(i/13),y=i%13;if(x===y)return RANKS[x]+RANKS[x];return x>y?RANKS[x]+RANKS[y]+'s':RANKS[y]+RANKS[x]+'o'}
+const PCT=new Float32Array(169);
+function draw(u){let c;do c=Math.random()*52|0;while(u[c]);u[c]=1;return c}
+function buildPCT(){
+  const rows=[];
+  for(let i=0;i<169;i++){const x=Math.floor(i/13),y=i%13;let a,b,n;
+    if(x===y){a=x*4;b=x*4+1;n=6}else if(x>y){a=x*4;b=y*4;n=4}else{a=y*4;b=x*4+1;n=12}
+    rows.push({i,n,e:equity([a,b],[],[{range:1,agg:0}],700).eq})}
+  rows.sort((p,q)=>q.e-p.e);let cum=0;
+  for(const r of rows){PCT[r.i]=(cum+r.n/2)/1326;cum+=r.n}
+}
+const pctOf=(a,b)=>PCT[cls(a,b)];
+
+/* ---------- Monte Carlo equity with opponent ranges ---------- */
+const U=new Uint8Array(52);
+function sample(o,board,out){
+  const n=board.length>=3?1+Math.min(o.agg,3):1;let best=-1,b0=-1,b1=-1;
+  for(let k=0;k<n;k++){let a,b,t=0;
+    for(;;){a=draw(U);b=draw(U);if(o.range>=1||pctOf(a,b)<=o.range||++t>40)break;U[a]=0;U[b]=0}
+    if(n===1){out[0]=a;out[1]=b;return}
+    const s=ev([a,b,...board]);
+    if(s>best){if(b0>=0){U[b0]=0;U[b1]=0}best=s;b0=a;b1=b}else{U[a]=0;U[b]=0}}
+  out[0]=b0;out[1]=b1;
+}
+function equity(hc,board,opps,iters){
+  let win=0,tie=0,eq=0;const oh=opps.map(()=>[0,0]),bb=new Array(5);
+  for(let it=0;it<iters;it++){
+    U.fill(0);for(const c of hc)U[c]=1;for(const c of board)U[c]=1;
+    for(let o=0;o<opps.length;o++)sample(opps[o],board,oh[o]);
+    for(let k=0;k<5;k++)bb[k]=k<board.length?board[k]:draw(U);
+    const hs=ev([hc[0],hc[1],...bb]);let lost=false,ties=0;
+    for(let o=0;o<opps.length;o++){const s=ev([oh[o][0],oh[o][1],...bb]);if(s>hs){lost=true;break}if(s===hs)ties++}
+    if(!lost){if(ties){tie++;eq+=1/(ties+1)}else{win++;eq++}}
+  }
+  return {win:win/iters,tie:tie/iters,eq:eq/iters};
+}
+
+/* ---------- game state ---------- */
+const BOTS=[['Viper','LAG'],['Maven','TAG'],['Ghost','TAG'],['Shark','LAG'],['Rook','TAG']];
+const STY={TAG:{open:1,agg:1,bluff:1},LAG:{open:1.3,agg:1.25,bluff:1.5}};
+const POS=['BTN','SB','BB','UTG','MP','CO'];
+const P=[{name:'You',hero:true,stack:START}].concat(BOTS.map(([n,s])=>({name:n,sty:s,stack:START})));
+const S={dealer:Math.random()*6|0,board:[],deck:[],street:0,cur:0,minR:BB,toAct:0,hand:0,raises:0,over:true,log:[],reveal:false,heroTurn:false,banner:''};
+const ST={hands:0,net:0,dec:0,leak:0,won:0};
+let opt={spd:800,auto:true,peek:false,c4:true};
+try{Object.assign(opt,JSON.parse(localStorage.getItem('pt-opt')||'{}'))}catch(e){}
+const posName=i=>POS[(i-S.dealer+6)%6];
+const potSize=()=>P.reduce((s,p)=>s+p.total,0);
+const minTo=()=>S.cur===0?BB:S.cur+S.minR;
+function rangeOf(p){if(p.pfLevel>=3)return .03;if(p.pfLevel===2)return .07;if(p.pfLevel===1)return({UTG:.15,MP:.19,CO:.28,BTN:.42,SB:.34,BB:.2})[p.pos]||.2;if(p.pfC)return .4;return 1}
+const L=(t,k='')=>S.log.push({t,k});
+const ct=c=>`<span class="lc c${st(c)}">${rl(rk(c))}${SYM[st(c)]}</span>`;
+let timer=null,nextT=null;
+
+function startHand(){
+  clearTimeout(nextT);
+  if(P[0].stack<=0){S.over=true;S.banner='You are out of chips — rebuy to continue.';render();return}
+  S.prevLog=S.log;S.log=[];
+  for(const p of P)if(!p.hero&&p.stack<BB*25){p.stack=START;L(`${p.name} reloads to ${START}`)}
+  S.hand++;S.dealer=(S.dealer+1)%6;S.board=[];S.street=0;S.raises=0;S.over=false;S.reveal=false;S.banner='';
+  const d=[...Array(52).keys()];for(let i=51;i>0;i--){const j=Math.random()*(i+1)|0;[d[i],d[j]]=[d[j],d[i]]}S.deck=d;
+  S.heroStart=P[0].stack;
+  P.forEach((p,i)=>Object.assign(p,{cards:[d.pop(),d.pop()],folded:false,allIn:false,bet:0,total:0,acted:false,pfLevel:0,pfC:false,agg:0,last:'',win:false,pos:posName(i)}));
+  const sb=(S.dealer+1)%6,bb=(S.dealer+2)%6;post(sb,SB);post(bb,BB);
+  P[sb].last='SB 1';P[bb].last='BB 2';
+  S.cur=BB;S.minR=BB;S.toAct=(bb+1)%6;
+  L(`Hand #${S.hand} — dealer ${P[S.dealer].name}`,'st');L(`Your cards: ${P[0].cards.map(ct).join(' ')}`);
+  proceed();
+}
+function post(i,a){const p=P[i];a=Math.min(a,p.stack);p.stack-=a;p.bet+=a;p.total+=a;if(!p.stack)p.allIn=true}
+function put(p,a){a=Math.min(a,p.stack);p.stack-=a;p.bet+=a;p.total+=a}
+function roundDone(){
+  const act=P.filter(p=>!p.folded&&!p.allIn),mx=Math.max(...P.filter(p=>!p.folded).map(p=>p.bet));
+  if(!act.length)return true;
+  if(act.length===1&&P.some(p=>!p.folded&&p.allIn))return act[0].bet>=mx;
+  return act.every(p=>p.acted&&p.bet===S.cur);
+}
+function proceed(){
+  const live=P.filter(p=>!p.folded);
+  if(live.length===1)return uncontested(live[0]);
+  if(roundDone()){render();return void(timer=setTimeout(nextStreet,450))}
+  let i=S.toAct,g=0;while((P[i].folded||P[i].allIn)&&g++<6)i=(i+1)%6;S.toAct=i;
+  if(P[i].hero){S.heroTurn=true;render()}
+  else{S.heroTurn=false;render();timer=setTimeout(()=>botAct(i),opt.spd*(0.6+Math.random()*.8))}
+}
+function act(i,type,to){
+  const p=P[i],toCall=S.cur-p.bet;let t;
+  if(type==='check'&&toCall>0)type='call';
+  if(type==='fold'){p.folded=true;t='folds'}
+  else if(type==='check')t='checks';
+  else if(type==='call'){const a=Math.min(toCall,p.stack);put(p,a);t=`calls ${a}`;if(!S.street)p.pfC=true}
+  else{const mx=p.bet+p.stack;to=Math.min(Math.max(Math.round(to),minTo()),mx);
+    if(to<=S.cur){const a=Math.min(toCall,p.stack);put(p,a);t=`calls ${a}`}
+    else{const bet0=S.cur===0;put(p,to-p.bet);if(to-S.cur>=S.minR)S.minR=to-S.cur;S.cur=to;
+      for(const q of P)if(q!==p)q.acted=false;
+      if(!S.street){S.raises++;p.pfLevel=S.raises}else p.agg++;
+      t=(bet0?'bets ':'raises to ')+to}}
+  if(!p.stack&&type!=='fold'){p.allIn=true;t+=' (all-in)'}
+  p.acted=true;p.last=t;L(`${p.name} ${t}`);
+  S.toAct=(i+1)%6;proceed();
+}
+function nextStreet(){
+  for(const p of P){p.bet=0;p.acted=false;if(!p.folded&&!p.allIn)p.last=''}
+  S.cur=0;S.minR=BB;
+  if(S.street===3)return showdown();
+  S.street++;
+  if(S.street===1)S.board.push(S.deck.pop(),S.deck.pop(),S.deck.pop());else S.board.push(S.deck.pop());
+  L(`${['','Flop','Turn','River'][S.street]}: ${S.board.map(ct).join(' ')} (pot ${potSize()})`,'st');
+  S.toAct=(S.dealer+1)%6;
+  if(P.filter(p=>!p.folded&&!p.allIn).length<=1){S.reveal=true;S.heroTurn=false;render();return void(timer=setTimeout(nextStreet,1200))}
+  proceed();
+}
+function uncontested(p){const pot=potSize();p.stack+=pot;p.win=true;L(`${p.name} wins ${pot} (no showdown)`,'w');S.banner=`${p.name} wins ${pot}`;endHand()}
+function showdown(){
+  S.reveal=true;const live=P.filter(p=>!p.folded);
+  for(const p of live){p.score=ev([...p.cards,...S.board]);L(`${p.name} shows ${p.cards.map(ct).join(' ')} — ${hname(p.score)}`)}
+  const lv=[...new Set(P.filter(p=>p.total>0).map(p=>p.total))].sort((a,b)=>a-b);let prev=0;const got=new Map();
+  for(const lvl of lv){let amt=0;for(const p of P)amt+=Math.max(0,Math.min(p.total,lvl)-prev);
+    let el=live.filter(p=>p.total>=lvl);if(!el.length)el=live;prev=lvl;if(!amt)continue;
+    const best=Math.max(...el.map(p=>p.score)),w=el.filter(p=>p.score===best),sh=Math.floor(amt/w.length);let rem=amt-sh*w.length;
+    for(const p of w){const g=sh+(rem-->0?1:0);p.stack+=g;got.set(p,(got.get(p)||0)+g)}}
+  const msgs=[];for(const [p,g] of got){const net=g-p.total;p.win=true;if(net>0||got.size===1){msgs.push(`${p.name} wins ${g} with ${hname(p.score)}`);L(`${p.name} wins ${g} — ${hname(p.score)}`,'w')}}
+  S.banner=msgs.join(' · ');endHand();
+}
+function endHand(){
+  S.over=true;S.heroTurn=false;ST.hands++;const d=P[0].stack-S.heroStart;ST.net+=d;if(d>0)ST.won++;
+  render();if(opt.auto&&P[0].stack>0)nextT=setTimeout(startHand,3600);
+}
+
+/* ---------- bot brain ---------- */
+function isIP(i){const o=j=>(j-S.dealer-1+12)%6,m=o(i);return P.every((q,j)=>j===i||q.folded||o(j)<m)}
+function botAct(i){
+  if(S.over)return;const p=P[i],sty=STY[p.sty],toCall=S.cur-p.bet,pot=potSize(),r=Math.random();
+  const d=S.street?postflop(i,p,sty,toCall,pot,r):preflop(i,p,sty,toCall,r);act(i,d[0],d[1]);
+}
+function preflop(i,p,sty,toCall,r){
+  const pct=pctOf(p.cards[0],p.cards[1]),pos=posName(i),eff=p.bet+p.stack,cf=toCall/eff,fold=toCall?['fold']:['check'];
+  if(!S.raises){
+    const limp=P.filter(q=>!q.folded&&q.pfC).length;
+    const th={UTG:.14,MP:.19,CO:.27,BTN:.44,SB:.36,BB:.14}[pos]*sty.open-limp*.02;
+    if(pct<th)return['raise',BB*(pos==='SB'?3:2.5)+limp*BB];
+    if(!toCall)return['check'];
+    if(pos==='SB'&&limp&&pct<.4)return['call'];
+    return fold;
+  }
+  if(S.raises===1){
+    const ip=pos==='BTN'||pos==='CO';
+    let callTh=pos==='BB'?(toCall<=BB*2.5?.42:toCall<=BB*4?.3:.17):ip?.18:pos==='SB'?.08:.12;
+    if(cf>.35)callTh=.05;
+    if(pct<.045*sty.agg||(pct>.13&&pct<.24&&r<.1*sty.bluff&&cf<.15)){const to=Math.round(S.cur*(ip?3:3.8));return['raise',to>eff*.45?eff:to]}
+    return pct<callTh?['call']:fold;
+  }
+  if(pct<.022||(S.raises===2&&pct<.03)){const to=Math.round(S.cur*2.3);return['raise',to>eff*.4?eff:to]}
+  if(pct<.06&&cf<.4||pct<.035)return['call'];
+  return fold;
+}
+function postflop(i,p,sty,toCall,pot,r){
+  const opps=P.filter(q=>q!==p&&!q.folded).map(q=>({range:rangeOf(q),agg:q.agg})),n=opps.length;
+  const e=equity(p.cards,S.board,opps,450).eq,ip=isIP(i),po=toCall/(pot+toCall),eff=p.bet+p.stack;
+  const betTo=f=>{let a=Math.max(BB,Math.round(pot*f));if(a>p.stack*.7)a=p.stack;return p.bet+a};
+  const raiseTo=()=>{let t=S.cur+Math.round((pot+toCall)*.8);if(t>eff*.6)t=eff;return t};
+  const strong=n===1?.72:.58,good=n===1?.55:.4,drawy=S.street<3&&e>.28&&e<.5;
+  if(!toCall){
+    if(e>strong)return r<.82?['raise',betTo(.6+r*.15)]:['check'];
+    if(e>good)return r<.55*sty.agg?['raise',betTo(.5)]:['check'];
+    if(drawy&&r<.35*sty.agg)return['raise',betTo(.6)];
+    if(n===1&&r<(ip?.26:.12)*sty.bluff)return['raise',betTo(S.street===3?.75:.5)];
+    return['check'];
+  }
+  const imp=S.street===1?.04:S.street===2?.02:0;
+  if(e>Math.max(.8,strong+.08))return r<.6*sty.agg?['raise',raiseTo()]:['call'];
+  if(e>strong&&r<.25*sty.agg)return['raise',raiseTo()];
+  if(e+imp>po+.02)return['call'];
+  if(drawy&&n===1&&r<.08*sty.bluff&&p.stack>toCall*3)return['raise',raiseTo()];
+  return['fold'];
+}
+
+/* ---------- hero helper ---------- */
+let HK='',HC=null;
+function outs(){
+  const h=P[0].cards,b=S.board,cur=ev([...h,...b])>>20,g={};let n=0;
+  for(let c=0;c<52;c++){if(h.includes(c)||b.includes(c))continue;const nc=ev([...h,...b,c])>>20,bc=ev([...b,c])>>20;if(nc>cur&&nc>bc){(g[nc]=g[nc]||[]).push(c);n++}}
+  return{g,n};
+}
+function threats(){
+  const h=P[0].cards,b=S.board,mine=ev([...h,...b]),un=[];for(let c=0;c<52;c++)if(!h.includes(c)&&!b.includes(c))un.push(c);
+  let beat=0,tie=0,tot=0;const g={};
+  for(let i=0;i<un.length;i++)for(let j=i+1;j<un.length;j++){tot++;const s=ev([un[i],un[j],...b]);
+    if(s>mine){beat++;const c=s>>20,k=clsName(cls(un[i],un[j]));(g[c]=g[c]||{n:0,k:{}}).n++;g[c].k[k]=(g[c].k[k]||0)+1}else if(s===mine)tie++}
+  return{beat,tie,tot,g};
+}
+function preInfo(){
+  const h=P[0].cards,cnt=Array(13).fill(4);for(const c of h)cnt[rk(c)]--;
+  const n=P.slice(1).filter(p=>!p.folded).length,cmb=r=>cnt[r]*(cnt[r]-1)/2;let all=0,hi=0;
+  const hp=rk(h[0])===rk(h[1])?rk(h[0]):-1;
+  for(let r=0;r<13;r++){all+=cmb(r);if(hp>=0&&r>hp)hi+=cmb(r)}
+  const atl=x=>1-Math.pow(1-x/1225,n);
+  return{n,anyPair:atl(all),higher:hp>=0?atl(hi):null,hp};
+}
+function computeHelper(){
+  const h=P[0],opp=P.slice(1).filter(p=>!p.folded);
+  return{rnd:equity(h.cards,S.board,opp.map(()=>({range:1,agg:0})),3000),
+    rng:equity(h.cards,S.board,opp.map(q=>({range:rangeOf(q),agg:q.agg})),2000),
+    outs:S.street&&S.street<3?outs():null,thr:S.street?threats():null,pre:S.street?null:preInfo(),n:opp.length};
+}
+function meter(lbl,e){return`<div class="eqrow"><span>${lbl}</span><div class="meter"><i style="width:${e.win*100}%;background:var(--good)"></i><i style="width:${e.tie*100}%;background:var(--gold)"></i></div><b>${pc(e.eq)}</b></div>`}
+function renderHelper(){
+  const h=P[0],el=$('#helper');
+  if(!h.cards||!h.cards.length){el.innerHTML='<h2>Odds helper</h2><p class="mute">Deal a hand to start.</p>';return}
+  if(h.folded){el.innerHTML=`<h2>Odds helper</h2><p class="hand">Folded</p><p class="mute">You were holding ${h.cards.map(ct).join(' ')}. Watch how the hand plays out — turn on study mode to see what the bots had.</p>`;return}
+  const k=[S.hand,S.street,P.filter(p=>!p.folded).length,P.reduce((s,p)=>s+p.agg+p.pfLevel,0)].join('|');
+  if(k!==HK){HK=k;HC=computeHelper()}
+  const c=HC,toCall=S.cur-h.bet,pot=potSize();let o='<h2>Odds helper</h2>';
+  if(S.street){const sc=ev([...h.cards,...S.board]);o+=`<p class="hand">${hname(sc)}</p>`}
+  else{const p=pctOf(h.cards[0],h.cards[1]);o+=`<p class="hand">${clsName(cls(h.cards[0],h.cards[1]))} · top ${pc(p)}</p>`}
+  o+=`<p class="mute">${h.cards.map(ct).join(' ')} ${S.board.length?'on '+S.board.map(ct).join(' '):''} · ${c.n} opponent${c.n>1?'s':''} in the hand</p>`;
+  o+=meter('vs random hands',c.rnd)+meter('vs likely ranges',c.rng);
+  o+=`<p class="mute">Green = win, gold = tie. "Likely ranges" narrows each bot's hand by how it has bet so far.</p>`;
+  if(S.heroTurn&&toCall>0){const need=toCall/(pot+toCall),okc=c.rng.eq>=need;
+    o+=`<div class="odds">Pot odds: call <strong>${Math.min(toCall,h.stack)}</strong> to win <strong>${pot}</strong> → need <strong>${pc(need)}</strong> equity.<br><span class="${okc?'ok':'no'}"><b>${okc?'Calling is profitable':'Calling loses money'}</b> vs likely ranges (${pc(c.rng.eq)}).</span></div>`}
+  if(c.outs){const u=52-2-S.board.length,n=c.outs.n;
+    const p1=n/u,p2=S.street===1?1-((u-n)*(u-n-1))/(u*(u-1)):null;
+    o+=`<div class="grp"><div class="t"><span>Outs to improve: ${n}</span><span class="num">${pc(p1)} next card${p2!=null?` · ${pc(p2)} by river`:''}</span></div>`;
+    for(const cat of Object.keys(c.outs.g).sort((a,b)=>b-a))o+=`<div style="margin-top:4px">${CAT[cat]} (${c.outs.g[cat].length})<div class="chips">${c.outs.g[cat].map(ct).join('')}</div></div>`;
+    if(!n)o+='<p class="mute">No cards improve your hand category.</p>';o+='</div>'}
+  if(c.thr){const t=c.thr,cats=Object.keys(t.g).sort((a,b)=>b-a);
+    o+=`<div class="grp"><div class="t"><span>Hands that beat you now</span><span class="num">${t.beat} / ${t.tot} combos</span></div><p class="mute">You beat ${pc((t.tot-t.beat-t.tie)/t.tot)} of all possible holdings${t.tie?`, tie ${t.tie}`:''}.${t.beat?'':' <b class="ok">You have the nuts right now.</b>'}</p>`;
+    for(const cat of cats){const ks=Object.entries(t.g[cat].k).sort((a,b)=>b[1]-a[1]);
+      o+=`<div style="margin-top:6px"><b>${CAT[cat]}</b> · ${t.g[cat].n} combos<div class="chips">${ks.slice(0,10).map(([k,v])=>`<span class="cls">${k} ×${v}</span>`).join('')}${ks.length>10?`<span class="mute">+${ks.length-10} more</span>`:''}</div></div>`}
+    o+='</div>'}
+  if(c.pre){const q=c.pre;o+=`<div class="grp"><div class="t"><span>Pairs out there</span></div><p class="mute" style="color:var(--ink)">Chance at least one of ${q.n} opponents holds a pocket pair: <b class="num">${pc(q.anyPair)}</b>${q.higher!=null?`<br>Chance someone holds a <b>higher</b> pair than your ${pl(q.hp)}: <b class="num">${pc(q.higher)}</b>`:''}</p></div>`}
+  el.innerHTML=o;
+}
+function coach(type){
+  const h=P[0],toCall=S.cur-h.bet;if(toCall<=0||!HC)return;
+  const pot=potSize(),need=toCall/(pot+toCall),e=HC.rng.eq;let m,g=true;
+  if(type==='fold'){g=e<need+.08;m=g?`Fold OK — you had ${pc(e)} vs ${pc(need)} needed.`:`Possible leak: folded ${pc(e)} equity when you only needed ${pc(need)}.`}
+  else if(type==='call'){g=e>=need-.04;m=g?(e>=need?`+EV call — ${pc(e)} equity vs ${pc(need)} needed.`:`Close call — ${pc(e)} vs ${pc(need)} needed; roughly break-even.`):`Leak: called with ${pc(e)} but needed ${pc(need)}. Only implied odds can rescue this.`}
+  else m=e>.6?`Value raise with ${pc(e)} equity.`:e<need?`Bluff-raise with ${pc(e)} — fine if your story is believable and they can fold.`:`Raise with ${pc(e)} equity.`;
+  ST.dec++;if(!g)ST.leak++;
+  $('#coach').innerHTML=`<b class="${g?'ok':'no'}">${g?'Good':'Leak'}</b> · ${m}`;
+}
+function heroAct(type){
+  if(!S.heroTurn)return;const to=+$('#rIn').value;coach(type);S.heroTurn=false;act(0,type,to);
+}
+
+/* ---------- rendering ---------- */
+function card(c,cl=''){return`<div class="cd c${st(c)} ${cl}"><b>${rl(rk(c))}</b><i>${SYM[st(c)]}</i></div>`}
+function render(){
+  document.body.classList.toggle('two',!opt.c4);
+  $('#seats').innerHTML=P.map((p,i)=>{
+    const show=p.cards&&p.cards.length&&(p.hero||opt.peek||(S.reveal&&!p.folded));
+    const cs=p.cards&&p.cards.length&&!(p.folded&&!p.hero&&!opt.peek)?p.cards.map(c=>show?card(c,p.win&&S.over?'win':''):'<div class="cd back"></div>').join(''):'';
+    return`<div class="seat s${i} ${p.folded?'fold':''} ${S.toAct===i&&!S.over&&(S.heroTurn||!p.hero)?'turn':''}"><div class="cards">${cs}</div><div class="plate">${p.pos?`<span class="pos">${p.pos}</span>`:''}${S.dealer===i?'<span class="dbtn">D</span>':''}<div class="nm">${p.name}${p.sty?`<small>${p.sty}</small>`:''}</div><div class="stk">${p.stack}</div><div class="lastA">${p.last||'&nbsp;'}</div></div></div>`}).join('');
+  $('#bets').innerHTML=P.map((p,i)=>p.bet?`<div class="bet b${i}">${p.bet}</div>`:'').join('');
+  $('#board').innerHTML=[0,1,2,3,4].map(k=>S.board[k]!=null?card(S.board[k]):'<div class="slot"></div>').join('');
+  $('#pot').textContent=`Pot ${potSize()}`;
+  $('#banner').innerHTML=S.banner?`<div class="banner">${S.banner}</div>`:'';
+  renderControls();renderHelper();
+  const lg=$('#log');lg.innerHTML=S.log.map(e=>`<div class="${e.k}">${e.t}</div>`).join('');lg.scrollTop=1e6;
+  const bb100=ST.hands?(ST.net/BB)/ST.hands*100:0;
+  $('#stats').innerHTML=`<span>Hands <b>${ST.hands}</b></span><span>Net <b class="${ST.net>=0?'ok':'no'}">${ST.net>=0?'+':''}${ST.net}</b></span><span>bb/100 <b>${bb100.toFixed(1)}</b></span><span>Coach checks <b>${ST.dec}</b></span><span>Leaks <b>${ST.leak}</b></span>`;
+}
+function renderControls(){
+  const h=P[0],my=S.heroTurn&&!S.over,toCall=S.cur-h.bet,mx=h.bet+h.stack,mn=Math.min(minTo(),mx),pot=potSize();
+  const bF=$('#bFold'),bC=$('#bCall'),bR=$('#bRaise'),bN=$('#bNext');
+  bF.disabled=!my||toCall<=0;bC.disabled=!my;bR.disabled=!my||mx<=S.cur;
+  bC.innerHTML=(toCall>0?`Call ${Math.min(toCall,h.stack)}`:'Check')+' <kbd>C</kbd>';
+  bR.innerHTML=(S.cur===0?'Bet':'Raise to')+' <kbd>R</kbd>';
+  bN.hidden=!S.over;bN.innerHTML=h.stack<=0&&S.over?'Rebuy 200 and deal':'Deal next hand <kbd>N</kbd>';
+  [bF,bC,bR].forEach(b=>b.hidden=S.over);
+  const sl=$('#rSl'),inp=$('#rIn');$('#rz').style.display=my&&mx>S.cur?'flex':'none';
+  if(my&&sl.dataset.k!==S.hand+'|'+S.street+'|'+S.cur){sl.dataset.k=S.hand+'|'+S.street+'|'+S.cur;sl.min=inp.min=mn;sl.max=inp.max=mx;sl.value=inp.value=mn;
+    const ps=S.cur===0?[['⅓ pot',pot/3],['½ pot',pot/2],['¾ pot',pot*.75],['Pot',pot]]:!S.street&&S.raises===0?[['2.5bb',5],['3bb',6],['4bb',8]]:[['2.5×',S.cur*2.5],['3×',S.cur*3],['Pot',S.cur+pot+toCall]];
+    $('#pre').innerHTML=ps.map(([l,v])=>`<button data-v="${Math.round(S.cur===0?h.bet+v:v)}">${l}</button>`).join('')+`<button data-v="${mx}">All-in</button>`}
+}
+function setR(v){const h=P[0],mx=h.bet+h.stack,mn=Math.min(minTo(),mx);v=Math.max(mn,Math.min(mx,Math.round(v)||mn));$('#rSl').value=$('#rIn').value=v}
+function save(){try{localStorage.setItem('pt-opt',JSON.stringify(opt))}catch(e){}}
+
+$('#bFold').onclick=()=>heroAct('fold');
+$('#bCall').onclick=()=>heroAct(S.cur-P[0].bet>0?'call':'check');
+$('#bRaise').onclick=()=>heroAct('raise');
+$('#bNext').onclick=()=>{if(P[0].stack<=0){P[0].stack=START;L('You rebuy for 200')}startHand()};
+$('#rSl').oninput=e=>setR(+e.target.value);
+$('#rIn').onchange=e=>setR(+e.target.value);
+$('#pre').onclick=e=>{const b=e.target.closest('button');if(b)setR(+b.dataset.v)};
+if(![350,800,1400].includes(+opt.spd))opt.spd=800;$('#oSpd').value=opt.spd;$('#oAuto').checked=opt.auto;$('#oPeek').checked=opt.peek;$('#o4c').checked=opt.c4;
+$('#oSpd').onchange=e=>{opt.spd=+e.target.value;save()};
+$('#oAuto').onchange=e=>{opt.auto=e.target.checked;save();if(!opt.auto)clearTimeout(nextT)};
+$('#oPeek').onchange=e=>{opt.peek=e.target.checked;save();render()};
+$('#o4c').onchange=e=>{opt.c4=e.target.checked;save();render()};
+document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'&&e.target.type==='number')return;const k=e.key.toLowerCase();
+  if(k==='f'&&!$('#bFold').disabled)heroAct('fold');else if(k==='c'&&!$('#bCall').disabled)$('#bCall').click();else if(k==='r'&&!$('#bRaise').disabled)heroAct('raise');else if(k==='n'&&S.over)$('#bNext').click()});
+
+render();
+setTimeout(()=>{buildPCT();startHand()},30);
+}
+</script>
+</body>
+</html>
